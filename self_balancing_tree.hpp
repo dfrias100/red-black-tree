@@ -19,14 +19,20 @@ namespace MyDataStructures {
             Node* left_child = nullptr;
             Node* right_child = nullptr;
 
-            std::pair<k, v> key_val_pair;
+            // This is used by the iterator class to return a
+            // std::pair with a const K element, internally,
+            // only K can be modified
+            using intern_pair = std::pair<k, v>;
+            using ext_pair    = std::pair<const k, v>;
+
+            intern_pair key_val_pair;
 
             Node(k key, v value) { key_val_pair.first = key; key_val_pair.second = value; }
             Node() { }
         };
 
         class BSTIterator : 
-            public std::iterator<std::bidirectional_iterator_tag, std::pair<K, V>> {
+            public std::iterator<std::bidirectional_iterator_tag, std::pair<const K, V>> {
         public:
             bool operator==(const BSTIterator& rhs) const {
                 return this->curr_node == rhs.curr_node;
@@ -35,34 +41,55 @@ namespace MyDataStructures {
                 return this->curr_node != rhs.curr_node;
             }
 
-            const std::pair<K, V>& operator*() const {
-                return curr_node->key_val_pair;
+            const std::pair<const K, V>& operator*() const {
+                return reinterpret_cast<const typename Node<K, V>::ext_pair&>(curr_node->key_val_pair);
             }
 
-            const std::pair<K, V>* operator->() const {
-                return &curr_node->key_val_pair;
+            const std::pair<const K, V>* operator->() const {
+                return reinterpret_cast<const typename Node<K, V>::ext_pair*>(&curr_node->key_val_pair);
+            }
+
+            std::pair<const K, V>& operator*() {
+                return reinterpret_cast<typename Node<K, V>::ext_pair&>(curr_node->key_val_pair);
+            }
+
+            std::pair<const K, V>* operator->() {
+                return reinterpret_cast<typename Node<K, V>::ext_pair*>(&curr_node->key_val_pair);
             }
 
             BSTIterator& operator++() {
                 Node<K, V>* N;
 
+                // We're at the end? Let's check
                 if (curr_node == nullptr) {
+                    // Try to go back to begin(), so we start from root
                     curr_node = tree->root;
 
+                    // The tree is empty, we can't allow this operation to succeed
                     if (curr_node == nullptr) {
                         throw std::underflow_error("");
                     }
 
+                    // Get the minimum leaf
                     while (curr_node->left_child != nullptr) {
                         curr_node = curr_node->left_child;
                     }
-                } else if (curr_node->right_child != nullptr) {
+                }
+                // What if we're already reached the minimum? Check the 
+                // inorder successor of this node if it exists 
+                else if (curr_node->right_child != nullptr) {
                     curr_node = curr_node->right_child;
 
                     while (curr_node->left_child != nullptr) {
                         curr_node = curr_node->left_child;
                     }
-                } else {
+                }
+                // We've hit a leaf with no children, in that case
+                // we have finished processing the left subtree,
+                // So we go up each nodes' parents until we find a
+                // node who is the left child of a parent, next
+                // increment we will go down the right subtree or up 1 level 
+                else {
                     N = curr_node->parent;
                     while (N != nullptr && curr_node == N->right_child) {
                         curr_node = N;
@@ -76,6 +103,7 @@ namespace MyDataStructures {
             }
 
             BSTIterator operator++(int) {
+                // Save the iterator before incrementing
                 BSTIterator tmp = *this;
                 ++(*this);
                 return tmp;
@@ -84,23 +112,39 @@ namespace MyDataStructures {
             BSTIterator operator--() {
                 Node<K, V>* N;
 
+                // This is essentially the mirrored version of the
+                // pre-increment operator
+                
+                // Again, we check if we're at end
                 if (curr_node == nullptr) {
+                    // Try to get the root
                     curr_node = tree->root;
 
+                    // Cannot decrement on an empty tree
                     if (curr_node == nullptr) {
                         throw std::underflow_error("");
                     }
 
+                    // This time find the maximum leaf
                     while (curr_node->right_child != nullptr) {
                         curr_node = curr_node->right_child;
                     }
-                } else if (curr_node->left_child != nullptr) {
+                } 
+                // We've finished processing the maxmimum node of this tree
+                // Find the maxmimum node of the next subtree (inorder predecessor) 
+                else if (curr_node->left_child != nullptr) {
                     curr_node = curr_node->left_child;
 
                     while (curr_node->right_child != nullptr) {
                         curr_node = curr_node->right_child;
                     }
-                } else {
+                }
+                // We've hit a leaf with no children, in that case
+                // we have finished processing the right subtree,
+                // So we go up each nodes' parents until we find a
+                // node who is the right child of a parent, next
+                // increment we will go down the left subtree or up 1 level  
+                else {
                     N = curr_node->parent;
                     while (N != nullptr && curr_node == N->left_child) {
                         curr_node = N;
@@ -114,6 +158,7 @@ namespace MyDataStructures {
             }
 
             BSTIterator operator--(int) {
+                // Save the iterator before decrementing
                 BSTIterator tmp = *this;
                 --(*this);
                 return tmp;
@@ -121,14 +166,14 @@ namespace MyDataStructures {
         private:
             friend class self_balancing_tree<K, V>;
 
-            const Node<K, V> *curr_node;
+            Node<K, V> *curr_node;
             const self_balancing_tree<K, V> *tree;
 
-            BSTIterator(const Node<K, V>* N, const self_balancing_tree<K, V>* T) : curr_node(N), tree(T) {};
+            BSTIterator(Node<K, V>* N, const self_balancing_tree<K, V>* T) : curr_node(N), tree(T) {};
         };
 
-        typedef BSTIterator const_iterator;
-        typedef const_iterator iterator;
+        typedef BSTIterator iterator;
+        typedef const BSTIterator const_iterator;
 
         size_t _size = 0;
         Node<K, V>* root = nullptr;
@@ -158,12 +203,16 @@ namespace MyDataStructures {
         inline void insert(K elem_key, V elem_value);
         inline void erase(const K& k);
         inline void clear();
-        inline bool empty();
+        inline bool empty() const;
         inline size_t size();
 
         inline const_iterator find(const K& key) const;
-        inline const_iterator begin() const;
-        inline const_iterator end() const;
+        inline const_iterator cbegin() const;
+        inline const_iterator cend() const;
+
+        inline iterator find(const K& key);
+        inline iterator begin();
+        inline iterator end();
     };
 
     template <typename K, typename V>
@@ -184,12 +233,39 @@ namespace MyDataStructures {
     }
 
     template <typename K, typename V>
-    inline typename self_balancing_tree<K, V>::const_iterator self_balancing_tree<K, V>::begin() const { 
+    inline typename self_balancing_tree<K, V>::iterator self_balancing_tree<K, V>::find(const K& key) {
+        Node<K, V>* Z = root;
+
+        while (Z != nullptr) {
+            if (key == Z->key_val_pair.first) {
+                break;
+            } else if (key < Z->key_val_pair.first) {
+                Z = Z->left_child;
+            } else {
+                Z = Z->right_child;
+            }
+        }
+
+        return BSTIterator(Z, this);
+    }
+
+    template <typename K, typename V>
+    inline typename self_balancing_tree<K, V>::const_iterator self_balancing_tree<K, V>::cbegin() const { 
         return BSTIterator(minimum_leaf(root), this);
     }
 
     template <typename K, typename V>
-    inline typename self_balancing_tree<K, V>::const_iterator self_balancing_tree<K, V>::end() const { 
+    inline typename self_balancing_tree<K, V>::const_iterator self_balancing_tree<K, V>::cend() const { 
+        return BSTIterator(nullptr, this);
+    }
+
+    template <typename K, typename V>
+    inline typename self_balancing_tree<K, V>::iterator self_balancing_tree<K, V>::begin() { 
+        return BSTIterator(minimum_leaf(root), this);
+    }
+
+    template <typename K, typename V>
+    inline typename self_balancing_tree<K, V>::iterator self_balancing_tree<K, V>::end() { 
         return BSTIterator(nullptr, this);
     }
 
@@ -215,7 +291,7 @@ namespace MyDataStructures {
     }
 
     template <typename K, typename V>
-    inline bool self_balancing_tree<K, V>::empty() {
+    inline bool self_balancing_tree<K, V>::empty() const {
         return (_size == 0);
     }
 
