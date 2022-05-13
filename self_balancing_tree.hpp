@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include <iterator>
-#include <cstddef>
 #include <exception>
 
 namespace MyDataStructures {
