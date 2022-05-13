@@ -1,10 +1,9 @@
 #ifndef SELF_BALANCING_TREE_HPP
 #define SELF_BALANCING_TREE_HPP
 
-#include <vector>
-#include <utility>
-#include <algorithm>
 #include <iostream>
+#include <iterator>
+#include <cstddef>
 #include <exception>
 
 namespace MyDataStructures {
@@ -20,12 +19,116 @@ namespace MyDataStructures {
             Node* left_child = nullptr;
             Node* right_child = nullptr;
 
-            k _key;
-            v _value;
+            std::pair<k, v> key_val_pair;
 
-            Node(k key, v value) : _key(key), _value(value) {}
-            Node() : _key(k()), _value(v()) {}
+            Node(k key, v value) { key_val_pair.first = key; key_val_pair.second = value; }
+            Node() { }
         };
+
+        class BSTIterator : 
+            public std::iterator<std::bidirectional_iterator_tag, std::pair<K, V>> {
+        public:
+            bool operator==(const BSTIterator& rhs) const {
+                return this->curr_node == rhs.curr_node;
+            }
+            bool operator!=(const BSTIterator& rhs) const {
+                return this->curr_node != rhs.curr_node;
+            }
+
+            const std::pair<K, V>& operator*() const {
+                return curr_node->key_val_pair;
+            }
+
+            const std::pair<K, V>* operator->() const {
+                return &curr_node->key_val_pair;
+            }
+
+            BSTIterator& operator++() {
+                Node<K, V>* N;
+
+                if (curr_node == nullptr) {
+                    curr_node = tree->root;
+
+                    if (curr_node == nullptr) {
+                        throw std::underflow_error("");
+                    }
+
+                    while (curr_node->left_child != nullptr) {
+                        curr_node = curr_node->left_child;
+                    }
+                } else if (curr_node->right_child != nullptr) {
+                    curr_node = curr_node->right_child;
+
+                    while (curr_node->left_child != nullptr) {
+                        curr_node = curr_node->left_child;
+                    }
+                } else {
+                    N = curr_node->parent;
+                    while (N != nullptr && curr_node == N->right_child) {
+                        curr_node = N;
+                        N = N->parent;
+                    }
+
+                    curr_node = N;
+                }
+
+                return *this;
+            }
+
+            BSTIterator operator++(int) {
+                BSTIterator tmp = *this;
+                ++(*this);
+                return tmp;
+            }
+
+            BSTIterator operator--() {
+                Node<K, V>* N;
+
+                if (curr_node == nullptr) {
+                    curr_node = tree->root;
+
+                    if (curr_node == nullptr) {
+                        throw std::underflow_error("");
+                    }
+
+                    while (curr_node->right_child != nullptr) {
+                        curr_node = curr_node->right_child;
+                    }
+                } else if (curr_node->left_child != nullptr) {
+                    curr_node = curr_node->left_child;
+
+                    while (curr_node->right_child != nullptr) {
+                        curr_node = curr_node->right_child;
+                    }
+                } else {
+                    N = curr_node->parent;
+                    while (N != nullptr && curr_node == N->left_child) {
+                        curr_node = N;
+                        N = N->parent;
+                    }
+
+                    curr_node = N;
+                }
+
+                return *this;
+            }
+
+            BSTIterator operator--(int) {
+                BSTIterator tmp = *this;
+                --(*this);
+                return tmp;
+            }
+        private:
+            friend class self_balancing_tree<K, V>;
+
+            const Node<K, V> *curr_node;
+            const self_balancing_tree<K, V> *tree;
+
+            BSTIterator(const Node<K, V>* N, const self_balancing_tree<K, V>* T) : curr_node(N), tree(T) {};
+        };
+
+        typedef BSTIterator const_iterator;
+        typedef const_iterator iterator;
 
         size_t _size = 0;
         Node<K, V>* root = nullptr;
@@ -33,6 +136,7 @@ namespace MyDataStructures {
         void destroy_helper(Node<K, V>* N);
 
         inline Node<K, V>* minimum_leaf(Node<K, V>* X);
+        inline const Node<K, V>* minimum_leaf(Node<K, V>* X) const;
         inline void left_rotate(Node<K, V>* X);
         inline void right_rotate(Node<K, V>* X);
         inline void repair_tree_after_insert(Node<K, V>* Z);
@@ -40,39 +144,7 @@ namespace MyDataStructures {
         inline void transplant(Node<K, V>* X, Node<K, V>* Y);
         inline void RB_BSTDelete(Node<K, V>* Z);
 
-        void inorder_helper(Node<K,V>* N) {
-            if (N == nullptr)
-                return;
-
-            inorder_helper(N->left_child);
-            std::cout << N->_key << ", " << N->_value << std::endl;
-            inorder_helper(N->right_child);
-        }
-
         public:
-        void inorder() {
-            inorder_helper(root);
-        }
-
-        void bylevel() {
-            if (_size == 0)
-                return;
-            std::vector<Node<K,V>*> level;
-            level.push_back(root);
-
-            while (!level.empty()) {
-                std::vector<Node<K,V>*> next_level;
-                for (auto N : level) {
-                    std::cout << "(" << (N->parent ? N->parent->_key : 'N') << "->";
-                    std::cout << N->_key << (N->color == NodeColor::Black ? 'B' : 'R') << ") ";
-                    if (N->left_child) next_level.push_back(N->left_child);
-                    if (N->right_child) next_level.push_back(N->right_child);
-                }
-                std::cout << std::endl;
-                level = next_level;
-            }
-        }
-
         self_balancing_tree() {};
         ~self_balancing_tree() {
             destroy_helper(root);
@@ -88,10 +160,49 @@ namespace MyDataStructures {
         inline void clear();
         inline bool empty();
         inline size_t size();
+
+        inline const_iterator find(const K& key) const;
+        inline const_iterator begin() const;
+        inline const_iterator end() const;
     };
 
     template <typename K, typename V>
+    inline typename self_balancing_tree<K, V>::const_iterator self_balancing_tree<K, V>::find(const K& key) const {
+        Node<K, V>* Z = root;
+
+        while (Z != nullptr) {
+            if (key == Z->key_val_pair.first) {
+                break;
+            } else if (key < Z->key_val_pair.first) {
+                Z = Z->left_child;
+            } else {
+                Z = Z->right_child;
+            }
+        }
+
+        return BSTIterator(Z, this);
+    }
+
+    template <typename K, typename V>
+    inline typename self_balancing_tree<K, V>::const_iterator self_balancing_tree<K, V>::begin() const { 
+        return BSTIterator(minimum_leaf(root), this);
+    }
+
+    template <typename K, typename V>
+    inline typename self_balancing_tree<K, V>::const_iterator self_balancing_tree<K, V>::end() const { 
+        return BSTIterator(nullptr, this);
+    }
+
+    template <typename K, typename V>
     inline self_balancing_tree<K, V>::Node<K, V>* self_balancing_tree<K, V>::minimum_leaf(Node<K, V>* X) {
+        while (X->left_child != nullptr) {
+            X = X->left_child;
+        }
+        return X;
+    }
+
+    template <typename K, typename V>
+    inline const typename self_balancing_tree<K, V>::Node<K, V>* self_balancing_tree<K, V>::minimum_leaf(Node<K, V>* X) const {
         while (X->left_child != nullptr) {
             X = X->left_child;
         }
@@ -115,17 +226,19 @@ namespace MyDataStructures {
 
         while (curr_node != nullptr) {
             prev_node = curr_node;
-            if (elem_key < curr_node->_key) {
+            if (elem_key < curr_node->key_val_pair.first) {
                 curr_node = curr_node->left_child;
-            } else if (elem_key > curr_node->_key) {
+            } else if (elem_key > curr_node->key_val_pair.first) {
                 curr_node = curr_node->right_child;
             } else {
-                return curr_node->_value;
+                return curr_node->key_val_pair.second;
             }
         }
 
         Node<K, V>* new_node = new Node<K, V>(elem_key, V());
-        if (elem_key < prev_node->_key) {
+        if (root == nullptr) {
+            root = new_node;
+        } else if (elem_key < prev_node->key_val_pair.first) {
             prev_node->left_child = new_node;
         } else {
             prev_node->right_child = new_node;
@@ -134,7 +247,7 @@ namespace MyDataStructures {
         repair_tree_after_insert(new_node);
         _size++;
 
-        return new_node->_value;
+        return new_node->key_val_pair.second;
     }
 
     template <typename K, typename V>
@@ -144,12 +257,12 @@ namespace MyDataStructures {
 
         while (curr_node != nullptr) {
             prev_node = curr_node;
-            if (elem_key < curr_node->_key) {
+            if (elem_key < curr_node->key_val_pair.first) {
                 curr_node = curr_node->left_child;
-            } else if (elem_key > curr_node->_key) {
+            } else if (elem_key > curr_node->key_val_pair.first) {
                 curr_node = curr_node->right_child;
             } else {
-                return curr_node->_value;
+                return curr_node->key_val_pair.second;
             }
         }
 
@@ -163,12 +276,12 @@ namespace MyDataStructures {
 
         while (curr_node != nullptr) {
             prev_node = curr_node;
-            if (elem_key < curr_node->_key) {
+            if (elem_key < curr_node->key_val_pair.first) {
                 curr_node = curr_node->left_child;
-            } else if (elem_key > curr_node->_key) {
+            } else if (elem_key > curr_node->key_val_pair.first) {
                 curr_node = curr_node->right_child;
             } else {
-                return curr_node->_value;
+                return curr_node->key_val_pair.second;
             }
         }
 
@@ -193,10 +306,10 @@ namespace MyDataStructures {
         bool elem_found = false;
 
         while (curr_node != nullptr) {
-            if (curr_node->_key == k) {
+            if (curr_node->key_val_pair.first == k) {
                 elem_found = true;
                 break;
-            } else if (k < curr_node->_key) {
+            } else if (k < curr_node->key_val_pair.first) {
                 curr_node = curr_node->left_child;
             } else {
                 curr_node = curr_node->right_child;
@@ -254,8 +367,8 @@ namespace MyDataStructures {
         transplant(Y, X);
 
         if (Y != Z) {
-            Z->_key = Y->_key;
-            Z->_value = Y->_value;
+            Z->key_val_pair.first = Y->key_val_pair.first;
+            Z->key_val_pair.second = Y->key_val_pair.second;
         }
 
         if (Y->color == NodeColor::Black) {
@@ -281,9 +394,9 @@ namespace MyDataStructures {
         if (root != nullptr) {
             while (curr_node != nullptr) {
                 prev_node = curr_node;
-                if (new_node->_key < curr_node->_key) {
+                if (new_node->key_val_pair.first < curr_node->key_val_pair.first) {
                     curr_node = curr_node->left_child;
-                } else if (new_node->_key > curr_node->_key) {
+                } else if (new_node->key_val_pair.first > curr_node->key_val_pair.first) {
                     curr_node = curr_node->right_child;
                 } else {
                     delete new_node;
@@ -293,7 +406,7 @@ namespace MyDataStructures {
         
             new_node->parent = prev_node;
 
-            if (new_node->_key < prev_node->_key) {
+            if (new_node->key_val_pair.first < prev_node->key_val_pair.first) {
                 prev_node->left_child = new_node;
             } else {
                 prev_node->right_child = new_node;
