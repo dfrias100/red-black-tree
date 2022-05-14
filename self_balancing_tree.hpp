@@ -533,7 +533,7 @@ namespace MyDataStructures {
     }
 
     template <typename K, typename V>
-    void self_balancing_tree<K, V>::repair_tree_after_delete(Node<K, V>* Z, Node<K, V>* P, bool left_child) {
+    inline void self_balancing_tree<K, V>::repair_tree_after_delete(Node<K, V>* Z, Node<K, V>* P, bool left_child) {
         Node<K, V>* W;
         while (Z != root && (Z == nullptr || Z->color == NodeColor::Black)) {
             if (left_child) {
@@ -610,7 +610,7 @@ namespace MyDataStructures {
     }
 
     template <typename K, typename V>
-    void self_balancing_tree<K, V>::repair_tree_after_insert(Node<K, V>* Z) {
+    inline void self_balancing_tree<K, V>::repair_tree_after_insert(Node<K, V>* Z) {
         while (Z != root && Z->parent->color == NodeColor::Red) {
             Node<K, V>* Y; 
             if (Z->parent == Z->parent->parent->left_child) {
