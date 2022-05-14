@@ -1,7 +1,6 @@
 #ifndef SELF_BALANCING_TREE_HPP
 #define SELF_BALANCING_TREE_HPP
 
-#include <iostream>
 #include <iterator>
 #include <exception>
 
