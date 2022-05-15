@@ -177,6 +177,7 @@ namespace MyDataStructures {
         Node<K, V>* root = nullptr;
 
         void destroy_helper(Node<K, V>* N);
+        Node<K, V>* clone_helper(const Node<K, V>* N, Node<K, V>* P);
 
         inline Node<K, V>* minimum_leaf(Node<K, V>* X);
         inline const Node<K, V>* minimum_leaf(Node<K, V>* X) const;
@@ -192,7 +193,12 @@ namespace MyDataStructures {
         ~self_balancing_tree() {
             destroy_helper(root);
             root = nullptr;
-        }
+        };
+
+        self_balancing_tree(const self_balancing_tree& T);
+        self_balancing_tree(self_balancing_tree&& T);
+        self_balancing_tree& operator=(const self_balancing_tree& T);
+        self_balancing_tree& operator=(self_balancing_tree&& T);
 
         V& operator[](K elem_key);
         V& at(K elem_key);
@@ -212,6 +218,44 @@ namespace MyDataStructures {
         inline iterator begin();
         inline iterator end();
     };
+
+    template <typename K, typename V>
+    self_balancing_tree<K, V>::self_balancing_tree(const self_balancing_tree<K, V>& T) {
+        this->_size = T._size;
+        this->root = clone_helper(T.root, nullptr);
+    }
+
+    template <typename K, typename V>
+    self_balancing_tree<K, V>::self_balancing_tree(self_balancing_tree<K, V>&& T) {
+        this->_size = T._size;
+        this->root = T.root;
+
+        T._size = 0;
+        T.root = nullptr;
+    }
+
+    template <typename K, typename V>
+    self_balancing_tree<K, V>& self_balancing_tree<K, V>::operator=(const self_balancing_tree<K, V>& T) {
+        destroy_helper(this->root);
+
+        this->_size = T._size;
+        this->root = clone_helper(T.root, nullptr);
+
+        return *this;
+    }
+
+    template <typename K, typename V>
+    self_balancing_tree<K, V>& self_balancing_tree<K, V>::operator=(self_balancing_tree<K, V>&& T) {
+        destroy_helper(this->root);
+
+        this->_size = T._size;
+        this->root = T.root;
+
+        T._size = 0;
+        T.root = nullptr;
+
+        return *this;
+    }
 
     template <typename K, typename V>
     inline typename self_balancing_tree<K, V>::const_iterator self_balancing_tree<K, V>::find(const K& key) const {
@@ -412,6 +456,21 @@ namespace MyDataStructures {
         destroy_helper(N->right_child);
 
         delete N;
+    }
+
+    template <typename K, typename V>
+    self_balancing_tree<K, V>::Node<K, V>* self_balancing_tree<K, V>::clone_helper(const Node<K, V>* N, Node<K, V>* P) {
+        if (N == nullptr)
+            return nullptr;
+        
+        Node<K, V>* Z = new Node<K, V>(N->key_val_pair.first, N->key_val_pair.second);
+        Z->color = N->color;
+        Z->parent = P;
+
+        Z->left_child = clone_helper(N->left_child, Z);
+        Z->right_child = clone_helper(N->right_child, Z);
+
+        return Z;
     }
 
     template <typename K, typename V>
